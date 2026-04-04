@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+
+  # 1. Backend - banking API
+  backend:
+    build:
+      context: ./backend/BankingApp-main
+      dockerfile: Dockerfile
+    container_name: backend
+    restart: always
+    expose:
+      - "5090"
+    volumes:
+      - db_data:/usr/src/app/database
+    networks:
+      - prf-network
+
+  # 2. Transactions - JavaScript microservice
+  transactions:
+    build:
+      context: ./transactions
+      dockerfile: Dockerfile
+    container_name: transactions
+    restart: always
+    expose:
+      - "4000"
+    depends_on:
+      - backend
+    networks:
+      - prf-network
+
+  # 3. Frontend - student portfolio
+  frontend:
+    build:
+      context: ./frontend/Studentportfoliotemplate_-main
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    expose:
+      - "80"
+    depends_on:
+      - backend
+    networks:
+      - prf-network
+
+  # 4. Nginx - reverse proxy, always last
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
+      - transactions
+    networks:
+      - prf-network
+
+volumes:
+  db_data:
+
+networks:
+  prf-network:
+    driver: bridge
