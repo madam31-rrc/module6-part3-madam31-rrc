@@ -1,0 +1,80 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+env:
+  REGISTRY: ghcr.io
+  REPO_OWNER: madam31-rrc
+  MAIN_REPO: module6-part3-madam31-rrc
+  GITOPS_REPO: module6-part3gitops
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend/BankingApp-main
+          push: true
+          tags: |
+            ghcr.io/madam31-rrc/module6-part3-madam31-rrc/backend:latest
+            ghcr.io/madam31-rrc/module6-part3-madam31-rrc/backend:${{ github.sha }}
+
+      - name: Build and push transactions image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./transactions
+          push: true
+          tags: |
+            ghcr.io/madam31-rrc/module6-part3-madam31-rrc/transactions:latest
+            ghcr.io/madam31-rrc/module6-part3-madam31-rrc/transactions:${{ github.sha }}
+
+      - name: Build and push studentportfolio image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend/Studentportfoliotemplate_-main
+          push: true
+          tags: |
+            ghcr.io/madam31-rrc/module6-part3-madam31-rrc/studentportfolio:latest
+            ghcr.io/madam31-rrc/module6-part3-madam31-rrc/studentportfolio:${{ github.sha }}
+
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v3
+        with:
+          repository: madam31-rrc/module6-part3gitops
+          token: ${{ secrets.GITOPS_PAT }}
+          path: gitops
+
+      - name: Update image tags in GitOps repo
+        run: |
+          cd gitops
+          sed -i "s|backend:.*|backend:${{ github.sha }}|g" k8s/backend-deployment.yaml
+          sed -i "s|transactions:.*|transactions:${{ github.sha }}|g" k8s/transactions-deployment.yaml
+          sed -i "s|studentportfolio:.*|studentportfolio:${{ github.sha }}|g" k8s/studentportfolio-deployment.yaml
+
+      - name: Commit and push to GitOps repo
+        run: |
+          cd gitops
+          git config user.email "madam31@academic.rrc.ca"
+          git config user.name "madam31-rrc"
+          git add .
+          git commit -m "Update image tags to ${{ github.sha }}" || echo "No changes"
+          git push
+
