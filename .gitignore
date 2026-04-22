@@ -1,0 +1,8 @@
+kubectl
+minikube-linux-amd64
+nginx-logs.txt
+*.db
+node_modules/
+__pycache__/
+*.pyc
+.env
